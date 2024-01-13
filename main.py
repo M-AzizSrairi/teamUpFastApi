@@ -10,6 +10,8 @@ from components.database import database
 from components.venues import router as venue_router
 from components.booking import router as booking_router
 from components.teams import router as team_router
+from dotenv import load_dotenv
+import os
 
 app = FastAPI()
 
@@ -42,5 +44,21 @@ async def shutdown():
     await database.disconnect()
 
 
+# Event handler to connect to the database when the app starts
+@app.on_event("startup")
+async def startup():
+    await database.connect()
+
+# Event handler to disconnect from the database when the app shuts down
+@app.on_event("shutdown")
+async def shutdown():
+    await database.disconnect()
+
 if __name__ == "__main__":
-    uvicorn.run("app.api:app", host="127.0.0.1", port=8000, reload=True)
+    # Get API keys from environment variables or use default values
+    open_weather_map_api_key = os.getenv("OPEN_WEATHER_MAP_API_KEY")
+
+    # Pass the API keys to your components
+    venue_router.openapi_dependencies = [Depends(open_weather_map_api_key)]
+
+    uvicorn.run("app.api:app", host="127.0.0.1", port=8001, reload=True)
