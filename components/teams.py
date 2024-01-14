@@ -10,11 +10,12 @@ router = APIRouter()
 @router.post("/createTeam", response_model=dict,status_code=status.HTTP_201_CREATED)
 async def create_team(
     team_create: TeamCreate,
+    db=Depends(database),
 ):
     # Check if the user is already a captain of a team
     query_team = select(team).where(team.c.captainid == team_create.captainid)
     
-    existing_team = await database.execute(query_team)
+    existing_team = await db.execute(query_team)
     
     if existing_team:
         raise HTTPException(
@@ -29,19 +30,22 @@ async def create_team(
     )
 
     # Add the new team to the database
-    await database.execute(query_create_new_team)
+    await db.execute(query_create_new_team)
     
     return {"message" : "Team created successfully"}
 
 @router.get("/searchPlayers", response_model=List[PlayerProfile])
-async def seach_players(query: str = Query(..., min_length=1)):
+async def seach_players(
+    query: str = Query(..., min_length=1),
+    db=Depends(database),
+):
         query = select([
             player_table.c.username,
             player_table.c.city,
             player_table.c.dob
             ]).where(player_table.c.username.ilike(f"%{query}%"))
         
-        results = await database.fetch_all(query)
+        results = await db.fetch_all(query)
         player_profiles = []
         for result in results:
             player_profile = PlayerProfile(
@@ -63,11 +67,12 @@ def calculate_age(dob: datetime) -> int:
 @router.post("/sendInvitation", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def send_invitation(
     invitation_create: InvitationCreate,
+    db=Depends(database),
 ):
     # Check if the invited player exist
     query_invited_player = select([player_table.c.username]).where(player_table.c.username == invitation_create.invitedplayerid)
 
-    existing_invited_player = await database.execute(query_invited_player)
+    existing_invited_player = await db.execute(query_invited_player)
     
     if not existing_invited_player:
         raise HTTPException(
@@ -77,7 +82,7 @@ async def send_invitation(
 
     # Check if the inviting player is the captain of a team
     query_inviting_captain_team = select(team).where(team.c.captainid == invitation_create.invitedby)
-    existing_inviting_captain_team = await database.execute(query_inviting_captain_team)
+    existing_inviting_captain_team = await db.execute(query_inviting_captain_team)
     
     if not existing_inviting_captain_team:
         raise HTTPException(
@@ -89,7 +94,7 @@ async def send_invitation(
         team.c.captainid == invitation_create.invitedby
     )
     
-    team_id = await database.execute(query_teamid)
+    team_id = await db.execute(query_teamid)
     
     # Create a new invitation
     query_create_invitation = insert(invitation).values(
@@ -100,16 +105,19 @@ async def send_invitation(
     )
 
     # Add the new invitation to the database
-    invitation_id = await database.execute(query_create_invitation)
+    invitation_id = await db.execute(query_create_invitation)
 
     return {"message" : "Invitation sent successfully"}
 
 
 @router.get("/getPlayerInvitations/{player_id}", response_model=list[InvitationResponse])
-async def get_player_invitations(player_id: str):
+async def get_player_invitations(
+    player_id: str,
+    db=Depends(database),
+):
     # Check if the player exists
     query_player_existence = select([player_table.c.username]).where(player_table.c.username == player_id)
-    existing_player = await database.execute(query_player_existence)
+    existing_player = await db.execute(query_player_existence)
     
     if not existing_player:
         raise HTTPException(
@@ -123,7 +131,7 @@ async def get_player_invitations(player_id: str):
         (invitation.c.status == "pending")
     )
 
-    pending_invitations = await database.fetch_all(query_pending_invitations)
+    pending_invitations = await db.fetch_all(query_pending_invitations)
 
     return pending_invitations
 
@@ -132,10 +140,11 @@ async def get_player_invitations(player_id: str):
 @router.put("/respondToInvitation", response_model=dict)
 async def respond_to_invitation(
     invitation_response: InvitationResponse,
+    db=Depends(database),
 ):
     # Get the invitation details
     query_invitation = select([invitation]).where(invitation.c.invitationid == invitation_response.invitationid)
-    invitation_details = await database.fetch_one(query_invitation)
+    invitation_details = await db.fetch_one(query_invitation)
 
     if not invitation_details:
         raise HTTPException(
@@ -154,7 +163,7 @@ async def respond_to_invitation(
 
     # Update the invitation status
     query_update_invitation = update(invitation).where(invitation.c.invitationid == invitation_response.invitationid).values(status=invitation_response.status, responded_at=datetime.utcnow())
-    await database.execute(query_update_invitation)
+    await db.execute(query_update_invitation)
     
     if invitation_response.status == "accepted":
         query = insert(teammembership).values(
@@ -162,25 +171,25 @@ async def respond_to_invitation(
             playerid=invitation_response.invitedplayerid,
             joined_at=datetime.utcnow(),
         )
-        await database.execute(query)
+        await db.execute(query)
 
     return {"message": f"Invitation is {invitation_response.status}"}
 
 
-async def is_player_team_member(team_id: int, player_id: str) -> bool:
+async def is_player_team_member(team_id: int, player_id: str,db=Depends(database)) -> bool:
     query_membership = select([teammembership]).where(
         (teammembership.c.teamid == team_id) & (teammembership.c.playerid == player_id)
     )
-    team_membership = await database.fetch_one(query_membership)
+    team_membership = await db.fetch_one(query_membership)
     return team_membership is not None
 
 
 
 @router.delete("/removeTeamMember/{team_id}/{remover}/{player_id}", response_model=dict)
-async def remove_team_member(team_id: int, remover: str, player_id: str):
+async def remove_team_member(team_id: int, remover: str, player_id: str,db=Depends(database)):
     # Check if the team exists
     query_team = select([team]).where(team.c.teamid == team_id)
-    existing_team = await database.fetch_one(query_team)
+    existing_team = await db.fetch_one(query_team)
 
     if not existing_team:
         raise HTTPException(
@@ -202,19 +211,19 @@ async def remove_team_member(team_id: int, remover: str, player_id: str):
     query_remove_member = delete(teammembership).where(
         (teammembership.c.teamid == team_id) & (teammembership.c.playerid == player_id)
     )
-    await database.execute(query_remove_member)
+    await db.execute(query_remove_member)
 
     return {"message": f"Team member {player_id} has been removed from Team {team_id}"}
 
 @router.get("/TeamBookings/{player_username}", response_model=dict, status_code=status.HTTP_200_OK)
 async def player_bookings(
-    player_username: str
+    player_username: str,
+    db=Depends(database),
 ):
     try:
         # Add some logging to see the flow of execution
         print(f"Fetching bookings for owner: {player_username}")
 
-        # Query bookings for the specified owner
         # Query bookings for the specified owner
         query_player_bookings = (
             select([booking])
@@ -238,7 +247,7 @@ async def player_bookings(
             .select_from(booking.join(team, team.c.captainid == player_table.c.username))
         )
 
-        player_bookings = await database.fetch_all(query_player_bookings)
+        player_bookings = await db.fetch_all(query_player_bookings)
 
         print(f"Player bookings: {player_bookings}")
 

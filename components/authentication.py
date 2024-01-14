@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from components.database import database
 from databases import Database 
+from fastapi.security import OAuth2PasswordBearer
+from passlib.hash import bcrypt
 
 router = APIRouter()
 
@@ -21,7 +23,7 @@ router = APIRouter()
 @router.post("/register", response_model=RegistrationResponse)
 async def register(user_data: UserRegistration):
     try:
-        # Basic validation, you might want to add more advanced validation logic
+        #Validation of password matching
         if user_data.password != user_data.confirm_password:
             raise HTTPException(status_code=400, detail="Passwords do not match")
 
@@ -37,17 +39,20 @@ async def register(user_data: UserRegistration):
         if existing_user:
             raise HTTPException(status_code=400, detail="Email or username already registered")
 
+        # Hash the password before storing it
+        hashed_password = bcrypt.hash(user_data.password)
+
         # Insert user data into the respective table
         query_insert_user = table.insert().values(
             email=user_data.email,
             username=user_data.username,
-            password=user_data.password,
+            password=hashed_password,
             dob=user_data.dob,
             city=user_data.city,
             user_type=user_data.user_type,
         )
 
-        # Execute the query to insert the new user
+        # Execution
         await database.execute(query_insert_user)
 
         return {"message": "User registered successfully"}
@@ -58,8 +63,7 @@ import secrets
 
 SECRET_KEY = secrets.token_urlsafe(32)
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # Pydantic model for the token response
 class Token(BaseModel):
@@ -77,21 +81,15 @@ def create_access_token(data: dict):
 # OAuth2PasswordBearer for handling token authentication (you may have this already)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-# Pydantic model for user login
-class UserLogin(BaseModel):
-    username: str
-    password: str
-
-# Login endpoint with JWT token issuance
+# Login endpoint with JWT token issuance and password hashing
 @router.post("/login", response_model=Token)
-async def login(user_data: UserLogin):
+async def login(user_data: UserLogin = Depends()):
     try:
         # Check if the user exists in the player table
         player_query = player_table.select().where(player_table.c.username == user_data.username)
         player_result = await database.fetch_one(player_query)
 
-        if player_result and player_result["password"] == user_data.password:
+        if player_result and bcrypt.verify(user_data.password, player_result["password"]):
             token_data = {"sub": user_data.username, "userType": "player"}
             access_token = create_access_token(token_data)
             return {"access_token": access_token, "token_type": "bearer"}
@@ -100,12 +98,12 @@ async def login(user_data: UserLogin):
         owner_query = owner_table.select().where(owner_table.c.username == user_data.username)
         owner_result = await database.fetch_one(owner_query)
 
-        if owner_result and owner_result["password"] == user_data.password:
+        if owner_result and bcrypt.verify(user_data.password, owner_result["password"]):
             token_data = {"sub": user_data.username, "userType": "owner"}
             access_token = create_access_token(token_data)
             return {"access_token": access_token, "token_type": "bearer"}
 
-        # If user not found, raise HTTPException
+        # If user not found or password doesn't match, raise HTTPException
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     except HTTPException as e:

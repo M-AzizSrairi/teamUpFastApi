@@ -9,14 +9,15 @@ router = APIRouter()
 
 @router.post("/createBooking", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def create_booking(
-    booking_data: BookingCreate
+    booking_data: BookingCreate,
+    db=Depends(database),
 ):
     try:
         # Check if the number of people does not exceed the venue capacity
         query_venue_capacity = select([venue_table.c.capacity]).where(
             venue_table.c.location == booking_data.location
         )
-        venue_capacity = await database.execute(query_venue_capacity)
+        venue_capacity = await db.execute(query_venue_capacity)
         
         if not venue_capacity:
             raise HTTPException(
@@ -51,7 +52,7 @@ async def create_booking(
                 )
             )
         )
-        overlapping_bookings = await database.execute(query_overlapping_bookings)
+        overlapping_bookings = await db.execute(query_overlapping_bookings)
 
         if overlapping_bookings:
             raise HTTPException(
@@ -63,7 +64,7 @@ async def create_booking(
         query_owner_username = select([venue_table.c.ownerusername]).where(
             venue_table.c.location == booking_data.location
         )
-        owner_username = await database.execute(query_owner_username)
+        owner_username = await db.execute(query_owner_username)
 
         if not owner_username:
             raise HTTPException(
@@ -81,7 +82,7 @@ async def create_booking(
             endtime=booking_data.endtime,
             numberofpeople=booking_data.numberofpeople,
         )
-        await database.execute(query_create_booking)
+        await db.execute(query_create_booking)
 
         return {"message": "Booking created successfully"}
 
@@ -100,7 +101,8 @@ async def create_booking(
 
 @router.get("/ownerBookings/{owner_username}", response_model=dict, status_code=status.HTTP_200_OK)
 async def owner_bookings(
-    owner_username: str
+    owner_username: str,
+    db=Depends(database),
 ):
     try:
         # Add some logging to see the flow of execution
@@ -110,7 +112,7 @@ async def owner_bookings(
         query_owner_bookings = select([booking]).where(
             booking.c.ownerusername == owner_username
         )
-        owner_bookings = await database.fetch_all(query_owner_bookings)
+        owner_bookings = await db.fetch_all(query_owner_bookings)
 
         print(f"Owner bookings: {owner_bookings}")
 
@@ -133,7 +135,8 @@ async def owner_bookings(
 
 @router.get("/playerBookings/{player_username}", response_model=dict, status_code=status.HTTP_200_OK)
 async def player_bookings(
-    player_username: str
+    player_username: str,
+    db=Depends(database),
 ):
     try:
         # Add some logging to see the flow of execution
@@ -143,7 +146,7 @@ async def player_bookings(
         query_player_bookings = select([booking]).where(
             booking.c.playerusername == player_username
         )
-        player_bookings = await database.fetch_all(query_player_bookings)
+        player_bookings = await db.fetch_all(query_player_bookings)
 
         print(f"Player bookings: {player_bookings}")
 
@@ -167,12 +170,13 @@ async def player_bookings(
 
 @router.put("/respondToBooking", response_model=dict)
 async def respond_to_booking(
-    response_data: BookingResponse
+    response_data: BookingResponse,
+    db=Depends(database),
 ):
     try:
         # Check if the booking exists
         query_booking = select([booking]).where(booking.c.bookingid == response_data.booking_id)
-        existing_booking = await database.fetch_one(query_booking)
+        existing_booking = await db.fetch_one(query_booking)
 
         if not existing_booking:
             raise HTTPException(
@@ -194,7 +198,7 @@ async def respond_to_booking(
             .where(booking.c.bookingid == response_data.booking_id)
             .values(status=new_status)
         )
-        await database.execute(query_update_status)
+        await db.execute(query_update_status)
 
         return {"message": f"Booking {response_data.booking_id} {new_status.capitalize()} successfully"}
 
