@@ -1,4 +1,4 @@
 # keys.py
-import os
+from decouple import config
 
-openWeatherMapAPIKey = os.environ.get("OPEN_WEATHER_MAP_API_KEY")
+openWeatherMapAPIKey = config("OPEN_WEATHER_MAP_API_KEY")

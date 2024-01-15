@@ -11,7 +11,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel
 from .models import VenueCreate, venue_table, images_table, VenueResponse, VenueCreate, VenueUpdate, VenueDelete, VenueLocationResponse, venue_table, forecastData
 from .authentication import get_logged_in_user
-from .database import database
+from .database import get_database
 from fastapi import Body
 from urllib.parse import urlparse
 from geopy.geocoders import Nominatim
@@ -20,6 +20,8 @@ from urllib.parse import urlparse, parse_qs
 import base64
 from bs4 import BeautifulSoup
 
+from ApiAuth.authentication import hash_password, create_access_token, verify_password, get_current_user
+from ApiAuth.database import get_db, User
 
 router = APIRouter()
 
@@ -28,12 +30,12 @@ import logging
 @router.post("/createVenue", response_model=dict)
 async def create_venue(
     venue_data: VenueCreate,
-    current_user: dict = Depends(get_logged_in_user),
-    db=Depends(database),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     try:
         # Logging statement to print information about the received request
-        logging.info(f"Received request from {current_user['username']}")
+        logging.info(f"Received request from {current_user['sub']}")
         logging.info(f"Request data: {venue_data.dict()}")
 
         # Ensure that the owner username is obtained dynamically
@@ -69,10 +71,10 @@ async def create_venue(
         return {"message": "Venue created successfully"}
     except Exception as e:
         # Log the error or return a more informative response
-        print(f"Error creating venue: {e}")
+        error_detail = {"detail": f"Error creating venue: {str(e)}"}
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "Internal Server Error"},
+            content=error_detail,
         )
         
 from fastapi import HTTPException
@@ -84,8 +86,9 @@ async def options_create_venue():
 # Endpoint to get venues for the current user
 @router.get("/getVenuesForCurrentOwner", response_model=List[VenueCreate])
 async def get_venues_for_user(
+    currentUser: dict = Depends(get_current_user),
     current_user: dict = Depends(get_logged_in_user),
-    db=Depends(database) 
+    db=Depends(get_database) 
     ):
     try:
         # Fetch venues based on the current user's ownerusername
@@ -114,7 +117,8 @@ async def get_venues_for_user(
 # Update /getVenues endpoint to use the modified VenueResponse model
 @router.get("/getVenues", response_model=List[VenueResponse])
 async def get_all_venues(
-    db=Depends(database),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     try:
         # Fetch all venues
@@ -158,7 +162,8 @@ async def get_filtered_venues(
     pitch_type: str = Query(None, description="Filter by pitch type"),
     price_range: int = Query(None, description="Filter by price range"),
     capacity_range: int = Query(None, description="Filter by capacity range"),
-    db=Depends(database)
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database)
 ):
     try:
         # Start building the base query
@@ -214,7 +219,8 @@ async def get_filtered_venues(
 @router.put("/updateVenue", response_model=dict)
 async def update_venue(
     venue_data: VenueUpdate,
-    db=Depends(database)
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database)
 ):
     try:
         # Check if the venue belongs to the current owner
@@ -279,7 +285,8 @@ async def update_venue(
 @router.delete("/deleteVenue", response_model=dict)
 async def delete_venue(
     venue_data: VenueDelete,
-    db=Depends(database),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     try:
         # Check if the venue belongs to the current owner
@@ -325,7 +332,8 @@ from urllib.parse import unquote
 
 @router.get("/get_all_venues_locations", response_model=List[VenueLocationResponse])
 async def get_all_venues_locations(
-    db=Depends(database),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     """
     Endpoint to retrieve map data for all venues using direct extraction from Google Maps share links.
@@ -417,7 +425,8 @@ from .Keys import openWeatherMapAPIKey
 @router.get("/get_weather_forecast")
 async def get_weather_forecast(
   forecastData: forecastData,
-  db=Depends(database),
+  current_user: dict = Depends(get_current_user),
+  db=Depends(get_database),
 ):
     try:
         # Convert the URL to a string

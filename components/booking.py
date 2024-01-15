@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from components.database import database
-from components.models import BookingCreate, booking, venue_table, BookingResponse
+from components.database import get_database
+from components.models import BookingCreate, booking, venue_table, BookingResponse, RespondBookingResponse
 from sqlalchemy.sql import select, insert, update, delete, and_, or_
+from ApiAuth.authentication import get_current_user
 
 
 router = APIRouter()
@@ -10,7 +11,8 @@ router = APIRouter()
 @router.post("/createBooking", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def create_booking(
     booking_data: BookingCreate,
-    db=Depends(database),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     try:
         # Check if the number of people does not exceed the venue capacity
@@ -102,7 +104,8 @@ async def create_booking(
 @router.get("/ownerBookings/{owner_username}", response_model=dict, status_code=status.HTTP_200_OK)
 async def owner_bookings(
     owner_username: str,
-    db=Depends(database),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     try:
         # Add some logging to see the flow of execution
@@ -136,7 +139,8 @@ async def owner_bookings(
 @router.get("/playerBookings/{player_username}", response_model=dict, status_code=status.HTTP_200_OK)
 async def player_bookings(
     player_username: str,
-    db=Depends(database),
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     try:
         # Add some logging to see the flow of execution
@@ -170,8 +174,9 @@ async def player_bookings(
 
 @router.put("/respondToBooking", response_model=dict)
 async def respond_to_booking(
-    response_data: BookingResponse,
-    db=Depends(database),
+    response_data: RespondBookingResponse,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     try:
         # Check if the booking exists

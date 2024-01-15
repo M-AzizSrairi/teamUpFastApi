@@ -1,25 +1,24 @@
 # main.py
 import uvicorn
-from fastapi import FastAPI, Depends, File, UploadFile, Form, status
+from fastapi import FastAPI, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from jose import JWTError, jwt
 from sqlalchemy import MetaData
-from components.authentication import router as auth_router
+from components.authentication import router as components_auth_router
 from components.database import database
 from components.venues import router as venue_router
 from components.booking import router as booking_router
 from components.teams import router as team_router
+from ApiAuth.endpoints import router as auth_api_router
 from dotenv import load_dotenv
 import os
 
 app = FastAPI()
 
-
-app.include_router(auth_router)
+app.include_router(components_auth_router)
 app.include_router(venue_router)
 app.include_router(booking_router)
 app.include_router(team_router)
+app.include_router(auth_api_router)
 
 metadata = MetaData()
 
@@ -35,23 +34,12 @@ app.add_middleware(
 
 # Event handler to connect to the database when the app starts
 @app.on_event("startup")
-async def startup():
+async def startup_event():
     await database.connect()
 
 # Event handler to disconnect from the database when the app shuts down
 @app.on_event("shutdown")
-async def shutdown():
-    await database.disconnect()
-
-
-# Event handler to connect to the database when the app starts
-@app.on_event("startup")
-async def startup():
-    await database.connect()
-
-# Event handler to disconnect from the database when the app shuts down
-@app.on_event("shutdown")
-async def shutdown():
+async def shutdown_event():
     await database.disconnect()
 
 if __name__ == "__main__":

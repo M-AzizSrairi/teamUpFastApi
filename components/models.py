@@ -91,7 +91,7 @@ class BookingCreate(BaseModel):
     endtime: time
     numberofpeople: int
     
-class BookingResponse(BaseModel):
+class RespondBookingResponse(BaseModel):
     booking_id: int
     ownerusername: str
     response: str  #either "accept" or "reject"
