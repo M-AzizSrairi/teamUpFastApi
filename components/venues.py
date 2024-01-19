@@ -19,45 +19,34 @@ from unshortenit import UnshortenIt
 from urllib.parse import urlparse, parse_qs
 import base64
 from bs4 import BeautifulSoup
+from typing import Annotated
 
 from ApiAuth.authentication import hash_password, create_access_token, verify_password, get_current_user
 from ApiAuth.database import get_db, User
+from ApiAuth.authentication import oauth2_scheme
 
 router = APIRouter()
 
 import logging
 
-@router.post("/createVenue", response_model=dict)
+@router.post("/createVenue", response_model=dict, tags=["Venues"])
 async def create_venue(
     venue_data: VenueCreate,
-    current_user: dict = Depends(get_current_user),
+    token: Annotated[str, Depends(oauth2_scheme)],
     db=Depends(get_database),
 ):
     try:
         # Logging statement to print information about the received request
-        logging.info(f"Received request from {current_user['sub']}")
         logging.info(f"Request data: {venue_data.dict()}")
-
         # Ensure that the owner username is obtained dynamically
         venue_data_dict = venue_data.dict()
-
         # Insert venue data into the venue table
         query_insert_venue = insert(venue_table).values(
-            ownerusername=venue_data_dict["ownerusername"],
-            ownername=venue_data_dict["ownername"],
-            phonenumber=venue_data_dict["phonenumber"],
-            city=venue_data_dict["city"],
-            country=venue_data_dict["country"],
-            location=venue_data_dict["location"],
-            workingdays=venue_data_dict["workingdays"],
-            price=venue_data_dict["price"],
-            capacity=venue_data_dict["capacity"],
-            area=venue_data_dict["area"],
-            ground=venue_data_dict["ground"],
-            description=venue_data_dict["description"],
+            ownerusername=venue_data_dict["ownerusername"], ownername=venue_data_dict["ownername"],phonenumber=venue_data_dict["phonenumber"], city=venue_data_dict["city"], country=venue_data_dict["country"], location=venue_data_dict["location"], workingdays=venue_data_dict["workingdays"],
+            price=venue_data_dict["price"], capacity=venue_data_dict["capacity"], area=venue_data_dict["area"],
+            ground=venue_data_dict["ground"], sdescription=venue_data_dict["description"],
         )
         venue_id = await db.execute(query_insert_venue) 
-
         # Insert image URLs into the images table
         for i, image_url in enumerate(venue_data.images):
             query_insert_image = insert(images_table).values(
@@ -67,10 +56,8 @@ async def create_venue(
                 image_url=image_url,
             )
             await db.execute(query_insert_image)
-
         return {"message": "Venue created successfully"}
     except Exception as e:
-        # Log the error or return a more informative response
         error_detail = {"detail": f"Error creating venue: {str(e)}"}
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -79,12 +66,12 @@ async def create_venue(
         
 from fastapi import HTTPException
 
-@router.options("/createVenue")
+@router.options("/createVenue", tags=["Venues"])
 async def options_create_venue():
     return {"msg": "OK"}
 
 # Endpoint to get venues for the current user
-@router.get("/getVenuesForCurrentOwner", response_model=List[VenueCreate])
+@router.get("/getVenuesForCurrentOwner", response_model=List[VenueCreate], tags=["Venues"])
 async def get_venues_for_user(
     currentUser: dict = Depends(get_current_user),
     current_user: dict = Depends(get_logged_in_user),
@@ -114,10 +101,9 @@ async def get_venues_for_user(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
     
 
-# Update /getVenues endpoint to use the modified VenueResponse model
-@router.get("/getVenues", response_model=List[VenueResponse])
+@router.get("/getVenues", response_model=List[VenueResponse], tags=["Venues"])
 async def get_all_venues(
-    current_user: dict = Depends(get_current_user),
+    token: Annotated[str, Depends(oauth2_scheme)],
     db=Depends(get_database),
 ):
     try:
@@ -137,7 +123,6 @@ async def get_all_venues(
             venue_dict['images'] = [image['image_url'] for image in images]
             venues_list.append(venue_dict)
 
-        # Ensure that the 'images' attribute is always a list
         for venue in venues_list:
             venue['images'] = venue.get('images', [])
 
@@ -155,41 +140,26 @@ from fastapi import Query
 
 
 # Create a new endpoint for filtered venues
-@router.get("/getFilteredVenues", response_model=List[VenueResponse])
+@router.get("/getFilteredVenues", response_model=List[VenueResponse], tags=["Venues"])
 async def get_filtered_venues(
-    city: str = Query(None, description="Filter by city"),
-    country: str = Query(None, description="Filter by country"),
-    pitch_type: str = Query(None, description="Filter by pitch type"),
-    price_range: int = Query(None, description="Filter by price range"),
-    capacity_range: int = Query(None, description="Filter by capacity range"),
-    current_user: dict = Depends(get_current_user),
-    db=Depends(get_database)
+    city: str = Query(None, description="Filter by city"),country: str = Query(None, description="Filter by country"), pitch_type: str = Query(None, description="Filter by pitch type"), price_range: int = Query(None, description="Filter by price range"), capacity_range: int = Query(None, description="Filter by capacity range"), current_user: dict = Depends(get_current_user), db=Depends(get_database)
 ):
     try:
         # Start building the base query
         query_venues = select([venue_table])
-
         # Apply filters based on query parameters
         if city:
             query_venues = query_venues.where(venue_table.c.city == city)
-
         if country:
             query_venues = query_venues.where(venue_table.c.country == country)
-
         if pitch_type:
             query_venues = query_venues.where(venue_table.c.ground == pitch_type)
-
-        # Apply filters for price range if provided
         if price_range is not None:
             query_venues = query_venues.where(venue_table.c.price <= price_range)
-
-        # Apply filters for capacity range if provided
         if capacity_range is not None:
             query_venues = query_venues.where(venue_table.c.capacity <= capacity_range)
-
         # Fetch filtered venues
         venues = await db.fetch_all(query_venues)
-
         # Fetch images for each venue
         venues_list = []
         for venue in venues:
@@ -201,14 +171,10 @@ async def get_filtered_venues(
             images = await db.fetch_all(query_images)
             venue_dict['images'] = [image['image_url'] for image in images]
             venues_list.append(venue_dict)
-
-        # Ensure that the 'images' attribute is always a list
         for venue in venues_list:
             venue['images'] = venue.get('images', [])
-
         # Convert the list of dictionaries to VenueResponse objects
         venues_response = [VenueResponse(**{key: venue[key] for key in VenueResponse.__annotations__}) for venue in venues_list]
-
         print('Filtered venues sent to the client:', venues_response)
         return venues_response
     except Exception as e:
@@ -216,11 +182,9 @@ async def get_filtered_venues(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
     
 
-@router.put("/updateVenue", response_model=dict)
+@router.put("/updateVenue", response_model=dict, tags=["Venues"])
 async def update_venue(
-    venue_data: VenueUpdate,
-    current_user: dict = Depends(get_current_user),
-    db=Depends(get_database)
+    venue_data: VenueUpdate, current_user: dict = Depends(get_current_user), db=Depends(get_database)
 ):
     try:
         # Check if the venue belongs to the current owner
@@ -234,13 +198,11 @@ async def update_venue(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not the owner of this venue.",
             )
-
         # Convert Pydantic model to dictionary and filter out unset values
         update_data = venue_data.model_dump(exclude_unset=True)
 
         # Extract images from update_data
         images = update_data.pop("images", None)
-
         # Update venue data in the database
         if update_data:
             query_update_venue = (
@@ -249,7 +211,6 @@ async def update_venue(
                 .values(**update_data)
             )
             await db.execute(query_update_venue)
-
         # Handle image updates separately
         if images:
             # First, delete existing images for the venue
@@ -258,7 +219,6 @@ async def update_venue(
                 (images_table.c.ownerusername == venue_data.ownerusername)
             )
             await db.execute(delete_query)
-
             # Insert new images for the venue
             for i, image_url in enumerate(images):
                 insert_query = insert(images_table).values(
@@ -268,7 +228,6 @@ async def update_venue(
                     image_url=image_url,
                 )
                 await db.execute(insert_query)
-
         return {"message": "Venue updated successfully"}
     except Exception as e:
         import traceback
@@ -282,7 +241,7 @@ async def update_venue(
 
 
 
-@router.delete("/deleteVenue", response_model=dict)
+@router.delete("/deleteVenue", response_model=dict, tags=["Venues"])
 async def delete_venue(
     venue_data: VenueDelete,
     current_user: dict = Depends(get_current_user),
@@ -299,14 +258,12 @@ async def delete_venue(
                 status_code=403,
                 detail="You are not the owner of this venue.",
             )
-
         # Delete images associated with the venue
         delete_images_query = images_table.delete().where(
             (images_table.c.location == venue_data.location) &
             (images_table.c.ownerusername == venue_data.ownerusername)
         )
         await db.execute(delete_images_query)
-
         # Delete the venue record
         delete_venue_query = venue_table.delete().where(
             (venue_table.c.location == venue_data.location) &
@@ -330,7 +287,7 @@ unshortenit = UnshortenIt()
 import requests
 from urllib.parse import unquote
 
-@router.get("/get_all_venues_locations", response_model=List[VenueLocationResponse])
+@router.get("/get_all_venues_locations", response_model=List[VenueLocationResponse], tags=["Venues"])
 async def get_all_venues_locations(
     current_user: dict = Depends(get_current_user),
     db=Depends(get_database),
@@ -422,7 +379,7 @@ import requests
 from .Keys import openWeatherMapAPIKey
 
 
-@router.get("/get_weather_forecast")
+@router.get("/get_weather_forecast", tags=["Forecast"])
 async def get_weather_forecast(
   forecastData: forecastData,
   current_user: dict = Depends(get_current_user),

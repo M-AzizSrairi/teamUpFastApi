@@ -8,7 +8,7 @@ from ApiAuth.authentication import get_current_user
 
 router = APIRouter()
 
-@router.post("/createBooking", response_model=dict, status_code=status.HTTP_201_CREATED)
+@router.post("/createBooking", response_model=dict, status_code=status.HTTP_201_CREATED, tags=["Bookings"])
 async def create_booking(
     booking_data: BookingCreate,
     current_user: dict = Depends(get_current_user),
@@ -101,14 +101,13 @@ async def create_booking(
         )
         
 
-@router.get("/ownerBookings/{owner_username}", response_model=dict, status_code=status.HTTP_200_OK)
+@router.get("/ownerBookings/{owner_username}", response_model=dict, status_code=status.HTTP_200_OK, tags=["Bookings"])
 async def owner_bookings(
     owner_username: str,
     current_user: dict = Depends(get_current_user),
     db=Depends(get_database),
 ):
     try:
-        # Add some logging to see the flow of execution
         print(f"Fetching bookings for owner: {owner_username}")
 
         # Query bookings for the specified owner
@@ -125,7 +124,7 @@ async def owner_bookings(
         return {"bookings": pydantic_bookings}
 
     except HTTPException as http_error:
-        raise http_error  # Re-raise HTTPExceptions to let FastAPI handle them
+        raise http_error
 
     except Exception as e:
         import traceback
@@ -136,14 +135,13 @@ async def owner_bookings(
             detail=f"Error fetching owner bookings: {str(e)}",
         )
 
-@router.get("/playerBookings/{player_username}", response_model=dict, status_code=status.HTTP_200_OK)
+@router.get("/playerBookings/{player_username}", response_model=dict, status_code=status.HTTP_200_OK, tags=["Bookings"])
 async def player_bookings(
     player_username: str,
     current_user: dict = Depends(get_current_user),
     db=Depends(get_database),
 ):
     try:
-        # Add some logging to see the flow of execution
         print(f"Fetching bookings for owner: {player_username}")
 
         # Query bookings for the specified owner
@@ -160,7 +158,7 @@ async def player_bookings(
         return {"bookings": player_pydantic_bookings}
 
     except HTTPException as http_error:
-        raise http_error  # Re-raise HTTPExceptions to let FastAPI handle them
+        raise http_error
 
     except Exception as e:
         import traceback
@@ -172,11 +170,9 @@ async def player_bookings(
         )
 
 
-@router.put("/respondToBooking", response_model=dict)
+@router.put("/respondToBooking", response_model=dict, tags=["Bookings"])
 async def respond_to_booking(
-    response_data: RespondBookingResponse,
-    current_user: dict = Depends(get_current_user),
-    db=Depends(get_database),
+    response_data: RespondBookingResponse, current_user: dict = Depends(get_current_user),db=Depends(get_database)
 ):
     try:
         # Check if the booking exists
@@ -188,14 +184,12 @@ async def respond_to_booking(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Booking not found",
             )
-
         # Check if the owner is responding to their own booking
         if existing_booking["ownerusername"] != response_data.ownerusername:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not authorized to respond to this booking",
             )
-
         # Update the status based on the owner's response
         new_status = "accepted" if response_data.response == "accept" else "rejected"
         query_update_status = (
@@ -204,9 +198,7 @@ async def respond_to_booking(
             .values(status=new_status)
         )
         await db.execute(query_update_status)
-
         return {"message": f"Booking {response_data.booking_id} {new_status.capitalize()} successfully"}
-
     except HTTPException as http_error:
         raise http_error  # Re-raise HTTPExceptions to let FastAPI handle them
 

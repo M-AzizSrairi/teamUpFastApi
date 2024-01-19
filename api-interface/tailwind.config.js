@@ -15,8 +15,8 @@ module.exports = {
       'black' : '#0c0a09',
     },
     backgroundImage : {
-           'parallax' : 'url("./Assets/team.jpg")',
-           'parallax2' : 'url("./Assets/pitch.jpg")',
+           'parallax' : 'url("./assets/team.jpg")',
+           'parallax2' : 'url("./assets/pitch.jpg")',
     }
   },
   plugins: [],

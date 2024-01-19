@@ -8,7 +8,7 @@ from ApiAuth.authentication import get_current_user
 
 router = APIRouter()
 
-@router.post("/createTeam", response_model=dict,status_code=status.HTTP_201_CREATED)
+@router.post("/createTeam", response_model=dict,status_code=status.HTTP_201_CREATED, tags=["Teams"])
 async def create_team(
     team_create: TeamCreate,
     current_user: dict = Depends(get_current_user),
@@ -36,7 +36,7 @@ async def create_team(
     
     return {"message" : "Team created successfully"}
 
-@router.get("/searchPlayers", response_model=List[PlayerProfile])
+@router.get("/searchPlayers", response_model=List[PlayerProfile], tags=["Teams"])
 async def seach_players(
     query: str = Query(..., min_length=1),
     current_user: dict = Depends(get_current_user),
@@ -67,11 +67,9 @@ def calculate_age(dob: datetime) -> int:
     
 
 
-@router.post("/sendInvitation", response_model=dict, status_code=status.HTTP_201_CREATED)
+@router.post("/sendInvitation", response_model=dict, status_code=status.HTTP_201_CREATED, tags=["Teams"])
 async def send_invitation(
-    invitation_create: InvitationCreate,
-    current_user: dict = Depends(get_current_user),
-    db=Depends(get_database),
+    invitation_create: InvitationCreate,current_user: dict = Depends(get_current_user),db=Depends(get_database),
 ):
     # Check if the invited player exist
     query_invited_player = select([player_table.c.username]).where(player_table.c.username == invitation_create.invitedplayerid)
@@ -83,7 +81,6 @@ async def send_invitation(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"The invited player '{invitation_create.invitedplayerid}' does not exist. Please provide a valid username.",
         )
-
     # Check if the inviting player is the captain of a team
     query_inviting_captain_team = select(team).where(team.c.captainid == invitation_create.invitedby)
     existing_inviting_captain_team = await db.execute(query_inviting_captain_team)
@@ -93,13 +90,10 @@ async def send_invitation(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"The inviting player '{invitation_create.invitedby}' is not a team captain. Only team captains can send invitations.",
         )
-
     query_teamid = select(team).where(
         team.c.captainid == invitation_create.invitedby
     )
-    
     team_id = await db.execute(query_teamid)
-    
     # Create a new invitation
     query_create_invitation = insert(invitation).values(
         teamid=team_id,
@@ -107,14 +101,11 @@ async def send_invitation(
         invitedby=invitation_create.invitedby,
         status = "pending",
     )
-
     # Add the new invitation to the database
     invitation_id = await db.execute(query_create_invitation)
-
     return {"message" : "Invitation sent successfully"}
 
-
-@router.get("/getPlayerInvitations/{player_id}", response_model=list[InvitationResponse])
+@router.get("/getPlayerInvitations/{player_id}", response_model=list[InvitationResponse], tags=["Teams"])
 async def get_player_invitations(
     player_id: str,
     current_user: dict = Depends(get_current_user),
@@ -142,11 +133,9 @@ async def get_player_invitations(
 
 
 
-@router.put("/respondToInvitation", response_model=dict)
+@router.put("/respondToInvitation", response_model=dict, tags=["Teams"])
 async def respond_to_invitation(
-    invitation_response: InvitationResponse,
-    current_user: dict = Depends(get_current_user),
-    db=Depends(get_database),
+    invitation_response: InvitationResponse,current_user: dict = Depends(get_current_user),db=Depends(get_database),
 ):
     # Get the invitation details
     query_invitation = select([invitation]).where(invitation.c.invitationid == invitation_response.invitationid)
@@ -170,7 +159,6 @@ async def respond_to_invitation(
     # Update the invitation status
     query_update_invitation = update(invitation).where(invitation.c.invitationid == invitation_response.invitationid).values(status=invitation_response.status, responded_at=datetime.utcnow())
     await db.execute(query_update_invitation)
-    
     if invitation_response.status == "accepted":
         query = insert(teammembership).values(
             teamid=invitation_response.teamid,
@@ -191,7 +179,7 @@ async def is_player_team_member(team_id: int, player_id: str, db=Depends(get_dat
 
 
 
-@router.delete("/removeTeamMember/{team_id}/{remover}/{player_id}", response_model=dict)
+@router.delete("/removeTeamMember/{team_id}/{remover}/{player_id}", response_model=dict, tags=["Teams"])
 async def remove_team_member(
     team_id: int, 
     remover: str, 
@@ -227,7 +215,7 @@ async def remove_team_member(
 
     return {"message": f"Team member {player_id} has been removed from Team {team_id}"}
 
-@router.get("/TeamBookings/{player_username}", response_model=dict, status_code=status.HTTP_200_OK)
+@router.get("/TeamBookings/{player_username}", response_model=dict, status_code=status.HTTP_200_OK, tags=["Teams"])
 async def player_bookings(
     player_username: str,
     current_user: dict = Depends(get_current_user),

@@ -23,11 +23,7 @@ router = APIRouter()
 
 # Endpoint for user registration
 @router.post("/register", response_model=RegistrationResponse)
-async def register(
-    user_data: UserRegistration,
-    current_user: dict = Depends(get_current_user),
-    db: Database=Depends(get_database),
-):
+async def register( user_data: UserRegistration,current_user: dict = Depends(get_current_user),db: Database=Depends(get_database),):
     try:
         #Validation of password matching
         if user_data.password != user_data.confirm_password:
@@ -44,10 +40,8 @@ async def register(
 
         if existing_user:
             raise HTTPException(status_code=400, detail="Email or username already registered")
-
         # Hash the password before storing it
         hashed_password = bcrypt.hash(user_data.password)
-
         # Insert user data into the respective table
         query_insert_user = table.insert().values(
             email=user_data.email,
@@ -57,13 +51,11 @@ async def register(
             city=user_data.city,
             user_type=user_data.user_type,
         )
-
         # Execution
         await db.execute(query_insert_user)
-
         return {"message": "User registered successfully"}
     except Exception as e:
-        raise
+        raise e
 
 import secrets
 
