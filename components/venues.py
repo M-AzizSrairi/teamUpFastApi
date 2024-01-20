@@ -32,7 +32,7 @@ import logging
 @router.post("/createVenue", response_model=dict, tags=["Venues"])
 async def create_venue(
     venue_data: VenueCreate,
-    token: Annotated[str, Depends(oauth2_scheme)],
+    current_user: dict = Depends(get_current_user),
     db=Depends(get_database),
 ):
     try:
@@ -44,7 +44,7 @@ async def create_venue(
         query_insert_venue = insert(venue_table).values(
             ownerusername=venue_data_dict["ownerusername"], ownername=venue_data_dict["ownername"],phonenumber=venue_data_dict["phonenumber"], city=venue_data_dict["city"], country=venue_data_dict["country"], location=venue_data_dict["location"], workingdays=venue_data_dict["workingdays"],
             price=venue_data_dict["price"], capacity=venue_data_dict["capacity"], area=venue_data_dict["area"],
-            ground=venue_data_dict["ground"], sdescription=venue_data_dict["description"],
+            ground=venue_data_dict["ground"], description=venue_data_dict["description"],
         )
         venue_id = await db.execute(query_insert_venue) 
         # Insert image URLs into the images table
@@ -71,15 +71,15 @@ async def options_create_venue():
     return {"msg": "OK"}
 
 # Endpoint to get venues for the current user
-@router.get("/getVenuesForCurrentOwner", response_model=List[VenueCreate], tags=["Venues"])
+@router.get("/getVenuesForCurrentOwner/{ownerusername}", response_model=List[VenueCreate], tags=["Venues"])
 async def get_venues_for_user(
+    ownerusername: str,
     currentUser: dict = Depends(get_current_user),
-    current_user: dict = Depends(get_logged_in_user),
     db=Depends(get_database) 
     ):
     try:
         # Fetch venues based on the current user's ownerusername
-        query_venues = select([venue_table]).where(venue_table.c.ownerusername == current_user['username'])
+        query_venues = select([venue_table]).where(venue_table.c.ownerusername == ownerusername)
         venues = await db.fetch_all(query_venues)
         
         # Convert venues to a list of dictionaries
@@ -103,7 +103,7 @@ async def get_venues_for_user(
 
 @router.get("/getVenues", response_model=List[VenueResponse], tags=["Venues"])
 async def get_all_venues(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    currentUser: dict = Depends(get_current_user),
     db=Depends(get_database),
 ):
     try:
@@ -184,7 +184,7 @@ async def get_filtered_venues(
 
 @router.put("/updateVenue", response_model=dict, tags=["Venues"])
 async def update_venue(
-    venue_data: VenueUpdate, current_user: dict = Depends(get_current_user), db=Depends(get_database)
+    venue_data: VenueUpdate, db=Depends(get_database)
 ):
     try:
         # Check if the venue belongs to the current owner
@@ -199,7 +199,7 @@ async def update_venue(
                 detail="You are not the owner of this venue.",
             )
         # Convert Pydantic model to dictionary and filter out unset values
-        update_data = venue_data.model_dump(exclude_unset=True)
+        update_data = venue_data.dict(exclude_unset=True)
 
         # Extract images from update_data
         images = update_data.pop("images", None)
@@ -234,8 +234,8 @@ async def update_venue(
         print(f"Error updating venue: {e}")
         traceback.print_exc()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not the owner of this venue.",
         )
 
 
@@ -275,8 +275,8 @@ async def delete_venue(
     except Exception as e:
         print(f"Error deleting venue: {e}")
         raise HTTPException(
-            status_code=500,
-            detail="Internal Server Error",
+            status_code=403,
+            detail="You are not the owner of this venue",
         )
 
 
@@ -382,8 +382,6 @@ from .Keys import openWeatherMapAPIKey
 @router.get("/get_weather_forecast", tags=["Forecast"])
 async def get_weather_forecast(
   forecastData: forecastData,
-  current_user: dict = Depends(get_current_user),
-  db=Depends(get_database),
 ):
     try:
         # Convert the URL to a string

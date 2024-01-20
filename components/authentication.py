@@ -1,5 +1,5 @@
 # app/authentication.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -23,7 +23,7 @@ router = APIRouter()
 
 # Endpoint for user registration
 @router.post("/register", response_model=RegistrationResponse)
-async def register( user_data: UserRegistration,current_user: dict = Depends(get_current_user),db: Database=Depends(get_database),):
+async def register( user_data: UserRegistration,db: Database=Depends(get_database)):
     try:
         #Validation of password matching
         if user_data.password != user_data.confirm_password:
@@ -90,7 +90,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 @router.post("/login", response_model=Token)
 async def login(
     user_data: UserLogin,
-    current_user: dict = Depends(get_current_user),
     db: Database=Depends(get_database),
 ):
     try:
@@ -121,7 +120,9 @@ async def login(
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
     
-# Added endpoint to get user details
-@router.get("/getLoggedInUser", response_model=dict)
-async def get_logged_in_user(username: str = Depends(oauth2_scheme)):
-    return {"username": username}
+def get_logged_in_user(token: str = Depends(oauth2_scheme)):
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username=payload.get("sub")
+        token_data = {"sub": username}
+        print(f"Decoded Token: {jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])}")
+        return token_data

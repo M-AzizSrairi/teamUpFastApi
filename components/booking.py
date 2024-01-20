@@ -172,7 +172,9 @@ async def player_bookings(
 
 @router.put("/respondToBooking", response_model=dict, tags=["Bookings"])
 async def respond_to_booking(
-    response_data: RespondBookingResponse, current_user: dict = Depends(get_current_user),db=Depends(get_database)
+    response_data: RespondBookingResponse, 
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database)
 ):
     try:
         # Check if the booking exists

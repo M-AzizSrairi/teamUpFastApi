@@ -69,7 +69,9 @@ def calculate_age(dob: datetime) -> int:
 
 @router.post("/sendInvitation", response_model=dict, status_code=status.HTTP_201_CREATED, tags=["Teams"])
 async def send_invitation(
-    invitation_create: InvitationCreate,current_user: dict = Depends(get_current_user),db=Depends(get_database),
+    invitation_create: InvitationCreate,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     # Check if the invited player exist
     query_invited_player = select([player_table.c.username]).where(player_table.c.username == invitation_create.invitedplayerid)
@@ -135,7 +137,9 @@ async def get_player_invitations(
 
 @router.put("/respondToInvitation", response_model=dict, tags=["Teams"])
 async def respond_to_invitation(
-    invitation_response: InvitationResponse,current_user: dict = Depends(get_current_user),db=Depends(get_database),
+    invitation_response: InvitationResponse,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_database),
 ):
     # Get the invitation details
     query_invitation = select([invitation]).where(invitation.c.invitationid == invitation_response.invitationid)
