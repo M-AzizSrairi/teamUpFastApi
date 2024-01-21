@@ -44,10 +44,8 @@ async def shutdown_event():
 
 
 if __name__ == "__main__":
-    # Get API keys from environment variables or use default values
     open_weather_map_api_key = os.getenv("OPEN_WEATHER_MAP_API_KEY")
 
-    # Pass the API keys to your components
     venue_router.openapi_dependencies = [Depends(open_weather_map_api_key)]
 
     uvicorn.run("app.api:app", host="127.0.0.1", port=8000, reload=True)
