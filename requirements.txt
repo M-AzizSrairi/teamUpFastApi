@@ -1,0 +1,16 @@
+fastapi==0.68.0
+uvicorn==0.15.0
+httpx==0.19.0
+sqlalchemy==1.4.22
+alembic==1.7.5
+bcrypt==3.2.0
+python-dotenv==0.19.0
+python-jose==3.3.0
+python-multipart==0.0.5
+passlib==1.7.5
+pydantic==1.10.0
+requests==2.26.0
+oauthlib==3.2.0
+httpx-oauth==0.13.3
+sqlalchemy-utils==0.38.0
+unshortenit==0.4.1
