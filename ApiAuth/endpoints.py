@@ -31,12 +31,15 @@ class User(BaseModel):
     id: int
     username: str
     email: Union[str, None] = None
-    full_name: Union[str, None] = None
+    password: str
     disabled: Union[bool, None] = None
 
 
-class UserInDB(User):
-    hashed_password: str
+class UserInDB(BaseModel):
+    username: str
+    email: str
+    password: str
+
 
 
 def verify_password(plain_password, hashed_password):
@@ -124,13 +127,13 @@ async def read_users_me(
 
 
 @router.post("/registerApiUser", response_model=dict)
-async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
+async def register_user(user_create: UserInDB, db: Session = Depends(get_db)):
     # Check if the username or email already exists
-    existing_user = db.query(User).filter(User.username == user_create.username).first()
+    existing_user = db.query(DBUser).filter(DBUser.username == user_create.username).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    existing_email = db.query(User).filter(User.email == user_create.email).first()
+    existing_email = db.query(DBUser).filter(DBUser.email == user_create.email).first()
     if existing_email:
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -138,12 +141,13 @@ async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
     hashed_password = get_password_hash(user_create.password)
 
     # Save the user to the database
-    db_user = User(username=user_create.username, email=user_create.email, hashed_password=hashed_password)
+    db_user = DBUser(username=user_create.username, email=user_create.email, hashed_password=hashed_password)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
     return {"message": "User registered successfully"}
+
 
 @router.post("/logout")
 async def logout_user(
@@ -176,3 +180,5 @@ async def logout_user(
     db.commit()
 
     return {"message": "Logout successful"}
+
+

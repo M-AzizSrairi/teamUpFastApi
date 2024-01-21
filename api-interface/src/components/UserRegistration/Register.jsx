@@ -9,7 +9,6 @@ const Register = () => {
     email: '',
     username: '',
     password: '',
-    confirm_password: '',
   });
 
   const handleChange = (e) => {
@@ -45,7 +44,6 @@ const Register = () => {
           email: formData.email,
           username: formData.username,
           password: formData.password,
-          confirm_password : formData.confirm_password,
         }),
       });
 
